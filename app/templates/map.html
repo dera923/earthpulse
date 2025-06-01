@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>EarthPulse｜通信ログマップ</title>
+
+  <!-- ✅ Leaflet のCSS（integrity属性削除済み） -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- ✅ Leaflet のJS（integrity属性削除済み） -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const map = L.map('map').setView([35.6895, 139.6917], 5); // 東京中心
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+    }).addTo(map);
+
+    // ✅ /data API から取得してマーカー描画
+    fetc("/data")
+      .then(response => response.json())
+      .then(json => {
+        json.data.forEach(entry => {
+          const { location, latency, timestamp } = entry;
+          L.marker([35.6895, 139.6917])  // 現在は仮に全て東京
+            .addTo(map)
+            .bindPopup(`📍 ${location}<br>📶 ${latency}ms<br>🕒 ${timestamp}`);
+        });
+      });
+  </script>
+</body>
+</html>h
