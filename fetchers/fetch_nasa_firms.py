@@ -1,12 +1,7 @@
-# fetch_nasa_firms.py
 import requests
 
 def fetch_nasa_firms_geojson():
-    """
-    NASA FIRMS から24時間以内の火災データ（VIIRS）をGeoJSON形式で取得。
-    出力例：https://firms.modaps.eosdis.nasa.gov/mapdata/VIIRS_Global_24h.json
-    """
-    url = "https://firms.modaps.eosdis.nasa.gov/mapdata/VIIRS_Global_24h.json"
+    url = "https://firms.modaps.eosdis.nasa.gov/mapserver/VIIRS_SNPP_VNP14IMG_NRT/VIIRS_SNPP_VNP14IMG_NRT.geojson"
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -15,5 +10,5 @@ def fetch_nasa_firms_geojson():
         return {
             "type": "FeatureCollection",
             "features": [],
-            "error": f"Fetch failed: {str(e)}"
+            "error": f"🔥 データ取得失敗: {str(e)}"
         }

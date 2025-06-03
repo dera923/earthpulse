@@ -1,26 +1,26 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
-# 推論API用の依存モジュール（すでに定義済）
-from app.infer import InferRequest, InferResponse, infer
+from app.api import map
+import asyncpg
 
 app = FastAPI()
 
-# ==== 🔁 推論エンドポイント ====
-@app.post("/infer", response_model=InferResponse)
-def infer_endpoint(req: InferRequest):
-    return infer(req)
+# 静的ファイルのマウント
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-# ==== 🧭 地図UIエンドポイント ====
+# Jinja2テンプレートの準備
 templates = Jinja2Templates(directory="app/templates")
 
-@app.get("/map", response_class=HTMLResponse)
-async def map_ui(request: Request):
-    return templates.TemplateResponse("map.html", {"request": request})
+# DBプール初期化
+@app.on_event("startup")
+async def startup():
+    app.state.pool = await asyncpg.create_pool(
+        user="postgres",
+        password="hnuc",  # ←ここは実パスワードに必ず変更
+        database="earthpulse_db",
+        host="localhost"
+    )
 
-
-# ==== 📁 静的ファイル（CSS/JSなど） ====
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# ルータ読み込み
+app.include_router(map.router)

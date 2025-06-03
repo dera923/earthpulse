@@ -1,50 +1,55 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>EarthPulse｜通信ログマップ</title>
-
-  <!-- ✅ Leaflet のCSS（integrity属性削除済み） -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
+  <meta charset="utf-8" />
+  <title>EarthPulse 地震マップ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <style>
-    body {
+    html, body, #map {
+      height: 100%;
       margin: 0;
-      padding: 0;
-    }
-    #map {
-      height: 100vh;
-      width: 100%;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- ✅ Leaflet のJS（integrity属性削除済み） -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([35.6895, 139.6917], 5); // 東京中心
+    const map = L.map('map').setView([35.6812, 139.7671], 5); // 東京中心
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // ✅ /data API から取得してマーカー描画
-    fetc("/data")
-      .then(response => response.json())
-      .then(json => {
-        json.data.forEach(entry => {
-          const { location, latency, timestamp } = entry;
-          L.marker([35.6895, 139.6917])  // 現在は仮に全て東京
-            .addTo(map)
-            .bindPopup(`📍 ${location}<br>📶 ${latency}ms<br>🕒 ${timestamp}`);
+    fetch("/earthquakes")
+      .then(res => res.json())
+      .then(data => {
+       console.log("取得したデータ:", data);
+
+        // 安全性チェック：features が配列であること
+        if (!data.features || !Array.isArray(data.features)) {
+          throw new Error("GeoJSONのfeaturesが存在しないか不正です");
+        }
+
+        data.features.forEach(feature => {
+          const coords = feature.geometry.coordinates;
+          const lon = coords[0];
+          const lat = coords[1];
+          const mag = parseFloat(feature.properties.mag) || 1.0;
+          const place = feature.properties.place || "Unknown location";
+
+          L.circleMarker([lat, lon], {
+            radius: 4 + mag,
+            color: "red",
+            fillOpacity: 0.6
+          }).bindPopup(`<b>${place}</b><br>Magnitude: ${mag}`).addTo(map);
         });
+      })
+      .catch(error => {
+        console.error("地震データの取得に失敗:", error);
       });
   </script>
 </body>
-</html>h
+</html> 
