@@ -1,10 +1,17 @@
 from fastapi import FastAPI
+from app.api import news
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.api import map
 import asyncpg
+from app.api import news, map_news  
 
 app = FastAPI()
+
+app.include_router(news.router)
+app.include_router(map_news.router)
+app.include_router(map.router)
+
 
 # 静的ファイルのマウント
 app.mount("/static", StaticFiles(directory="static"), name="static")
