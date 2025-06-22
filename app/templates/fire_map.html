@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>EarthPulse 火災マップ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <style>
+        html, body, #map { height: 100%; margin: 0; }
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 2px 0;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="map-controls">
+        <button onclick="toggleFireData()" id="fireToggle">火災データ表示</button>
+        <button onclick="refreshData()">データ更新</button>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff4444;"></div>
+            <span>高輝度火災 (>330K)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff8844;"></div>
+            <span>中輝度火災 (310-330K)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ffaa44;"></div>
+            <span>低輝度火災 (<310K)</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([39.8283, -98.5795], 4);  // アメリカ中心
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let fireLayer = L.layerGroup().addTo(map);
+        let showingFires = true;
+
+        function getFireColor(brightness) {
+            if (brightness > 330) return '#ff4444';  // 高輝度（赤）
+            if (brightness > 310) return '#ff8844';  // 中輝度（オレンジ）
+            return '#ffaa44';  // 低輝度（黄色）
+        }
+
+        function loadFireData() {
+            fetch('/fires-data')
+                .then(res => res.json())
+                .then(data => {
+                    fireLayer.clearLayers();
+                    
+                    data.features.forEach(fire => {
+                        const lat = fire.latitude;
+                        const lon = fire.longitude;
+                        const brightness = fire.brightness;
+                        const confidence = fire.confidence;
+                        const acqDate = fire.acq_date;
+                        const acqTime = fire.acq_time;
+
+                        const color = getFireColor(brightness);
+                        const radius = Math.max(3, Math.min(15, brightness / 25));
+
+                        L.circleMarker([lat, lon], {
+                            radius: radius,
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.7,
+                            weight: 1
+                        }).bindPopup(`
+                            <b>火災検知</b><br>
+                            輝度: ${brightness}K<br>
+                            信頼度: ${confidence}<br>
+                            検知日時: ${acqDate} ${acqTime}<br>
+                            位置: ${lat.toFixed(4)}, ${lon.toFixed(4)}
+                        `).addTo(fireLayer);
+                    });
+                    
+                    console.log(`火災データ ${data.features.length} 件を地図に表示しました`);
+                })
+                .catch(err => {
+                    console.error("火災データ取得失敗:", err);
+                    alert("火災データの取得に失敗しました");
+                });
+        }
+
+        function toggleFireData() {
+            const button = document.getElementById('fireToggle');
+            if (showingFires) {
+                map.removeLayer(fireLayer);
+                button.textContent = '火災データ非表示';
+                showingFires = false;
+            } else {
+                map.addLayer(fireLayer);
+                button.textContent = '火災データ表示';
+                showingFires = true;
+            }
+        }
+
+        function refreshData() {
+            loadFireData();
+        }
+
+        // 初期データ読み込み
+        loadFireData();
+    </script>
+</body>
+</html> 

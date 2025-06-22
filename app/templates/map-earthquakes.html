@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>EarthPulse 地震マップ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+    <script>
+        // 地図初期化（東京中心）
+        const map = L.map('map').setView([35.6812, 139.7671], 4);
+
+        // タイルレイヤー
+        L.tileLayer('https://{s}.tle.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 地震データ取得してマーカー表示
+        fetch("/earthquakes-data")
+            .then(res => res.json())
+            .then(data => {
+                console.log("取得したデータ：", data);
+
+                data.features.forEach(feature => {
+                    const lon = feature.longitude;
+                    const lat = feature.latitude;
+                    const mag = feature.mag;
+                    const place = feature.place;
+                    const timestamp = feature.timestamp;
+
+		    console.log("lat:", lat, "lon:", lon, "mag:", mag, "place:", place, "time:", time);
+
+                    L.circleMarker([lat, lon], {
+                        radius: 4 + parseFloat(mag),
+                        color: 'red',
+                        fillOpacity: 0.6
+                    }).bindPopup(
+                        `<b>${place}</b><br>Magnitude: ${mag}<br>Time: ${timestamp}`
+                    ).addTo(map);
+                });
+            })
+            .catch(error => {
+                console.error("地震データの取得に失敗：", error);
+            });
+    </script>
+</body>
+</html>
+

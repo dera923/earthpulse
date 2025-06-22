@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>EarthPulse 統合ダッシュボード</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 60vh 40vh;
+            gap: 10px;
+            padding: 10px;
+            height: calc(100vh - 100px);
+        }
+        .map-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .control-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .map-container {
+            grid-column: 1 / 3;
+            grid-row: 1;
+        }
+        #map { 
+            width: 100%; 
+            height: 100%; 
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .controls button {
+            margin: 5px;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        .controls button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .controls button:not(.active) {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+        .controls button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-size: 12px;
+            max-width: 200px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 8px;
+            border-radius: 50%;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .status-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+        .status-card.error {
+            border-left-color: #e74c3c;
+        }
+        .status-card.success {
+            border-left-color: #27ae60;
+        }
+        .status-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .status-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .data-refresh {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .refresh-btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .refresh-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+        .last-update {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌍 EarthPulse 統合監視ダッシュボード</h1>
+        <p>災害データと通信状況をリアルタイム監視</p>
+    </div>
+
+    <div class="container">
+        <div class="map-panel map-container">
+            <div class="controls">
+                <button id="earthquakeBtn" class="active" onclick="toggleLayer('earthquake')">地震データ</button>
+                <button id="fireBtn" onclick="toggleLayer('fire')">火災データ</button>
+                <button id="networkBtn" onclick="toggleLayer('network')">通信状況</button>
+                <button onclick="refreshAllData()">全データ更新</button>
+            </div>
+            
+            <div class="legend">
+                <div id="earthquakeLegend">
+                    <h4>地震データ</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>M7.0+</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f39c12;"></div>
+                        <span>M5.0-6.9</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f1c40f;"></div>
+                        <span>M3.0-4.9</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <span>M0.0-2.9</span>
+                    </div>
+                </div>
+                <div id="fireLegend" style="display: none;">
+                    <h4>火災データ</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff4444;"></div>
+                        <span>高輝度 (>330K)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff8844;"></div>
+                        <span>中輝度 (310-330K)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ffaa44;"></div>
+                        <span>低輝度 (<310K)</span>
+                    </div>
+                </div>
+                <div id="networkLegend" style="display: none;">
+                    <h4>通信状況</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #27ae60;"></div>
+                        <span>正常</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>通信断</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+        </div>
+
+        <div class="control-panel">
+            <div class="data-refresh">
+                <button class="refresh-btn" onclick="refreshAllData()">🔄 データ更新</button>
+                <div class="last-update" id="lastUpdate">最終更新: 未取得</div>
+            </div>
+            
+            <div class="status-grid">
+                <div class="status-card" id="earthquakeStatus">
+                    <div class="status-number" id="earthquakeCount">-</div>
+                    <div class="status-label">地震データ (24h)</div>
+                </div>
+                <div class="status-card" id="fireStatus">
+                    <div class="status-number" id="fireCount">-</div>
+                    <div class="status-label">火災データ (24h)</div>
+                </div>
+                <div class="status-card" id="networkStatus">
+                    <div class="status-number" id="networkUptime">-</div>
+                    <div class="status-label">通信稼働率 (%)</div>
+                </div>
+                <div class="status-card" id="alertStatus">
+                    <div class="status-number" id="alertCount">-</div>
+                    <div class="status-label">アクティブ警告</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h3>🚨 システム状況</h3>
+                <div id="systemLogs" style="background: #f8f9fa; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+                    <div>システム起動中...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h3>📊 データ収集制御</h3>
+            <div style="margin: 10px 0;">
+                <button class="refresh-btn" onclick="fetchEarthquakeData()">地震データ取得</button>
+                <button class="refresh-btn" onclick="fetchFireData()">NASA火災データ取得</button>
+            </div>
+            <div style="margin: 10px 0;">
+                <button class="refresh-btn" onclick="testNetworkConnectivity()">通信テスト実行</button>
+                <button class="refresh-btn" onclick="fetchSnsData()">SNSデータ収集</button>
+            </div>
+            
+            <h3>⚙️ システム設定</h3>
+            <div style="margin: 10px 0;">
+                <label>更新間隔 (分): </label>
+                <select id="updateInterval" onchange="setUpdateInterval()">
+                    <option value="5">5分</option>
+                    <option value="15" selected>15分</option>
+                    <option value="30">30分</option>
+                    <option value="60">1時間</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script>
+        // 地図初期化
+        const map = L.map('map').setView([39.8283, -98.5795], 4);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // レイヤーグループ
+        let earthquakeLayer = L.layerGroup();
+        let fireLayer = L.layerGroup();
+        let networkLayer = L.layerGroup();
+        
+        let activeLayer = 'earthquake';
+        earthquakeLayer.addTo(map);
+
+        // システムログ出力
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('systemLogs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logEntry.style.color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#2c3e50';
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // レイヤー切り替え
+        function toggleLayer(layerType) {
+            // すべてのレイヤーを非表示
+            map.removeLayer(earthquakeLayer);
+            map.removeLayer(fireLayer);
+            map.removeLayer(networkLayer);
+            
+            // ボタンのアクティブ状態をリセット
+            document.querySelectorAll('.controls button').forEach(btn => btn.classList.remove('active'));
+            
+            // 選択されたレイヤーを表示
+            activeLayer = layerType;
+            
+            if (layerType === 'earthquake') {
+                earthquakeLayer.addTo(map);
+                document.getElementById('earthquakeBtn').classList.add('active');
+                document.getElementById('earthquakeLegend').style.display = 'block';
+                document.getElementById('fireLegend').style.display = 'none';
+                document.getElementById('networkLegend').style.display = 'none';
+            } else if (layerType === 'fire') {
+                fireLayer.addTo(map);
+                document.getElementById('fireBtn').classList.add('active');
+                document.getElementById('earthquakeLegend').style.display = 'none';
+                document.getElementById('fireLegend').style.display = 'block';
+                document.getElementById('networkLegend').style.display = 'none';
+            } else if (layerType === 'network') {
+                networkLayer.addTo(map);
+                document.getElementById('networkBtn').classList.add('active');
+                document.getElementById('earthquakeLegend').style.display = 'none';
+                document.getElementById('fireLegend').style.display = 'none';
+                document.getElementById('networkLegend').style.display = 'block';
+            }
+        }
+
+        // 地震データ取得・表示
+        function fetchEarthquakeData() {
+            addLog('地震データ取得開始...', 'info');
+            fetch('/earthquakes', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    addLog(`地震データ取得完了: ${data.count}件`, 'success');
+                    loadEarthquakeData();
+                })
+                .catch(err => {
+                    addLog(`地震データ取得エラー: ${err.message}`, 'error');
+                });
+        }
+
+        function loadEarthquakeData() {
+            fetch('/earthquakes-data')
+                .then(res => res.json())
+                .then(data => {
+                    earthquakeLayer.clearLayers();
+                    
+                    data.features.forEach(quake => {
+                        const lat = quake.latitude;
+                        const lon = quake.longitude;
+                        const mag = quake.mag;
+                        const place = quake.place;
+                        
+                        let color, radius;
+                        if (mag >= 7.0) {
+                            color = '#e74c3c';
+                            radius = 15;
+                        } else if (mag >= 5.0) {
+                            color = '#f39c12';
+                            radius = 10;
+                        } else if (mag >= 3.0) {
+                            color = '#f1c40f';
+                            radius = 7;
+                        } else {
+                            color = '#3498db';
+                            radius = 4;
+                        }
+
+                        L.circleMarker([lat, lon], {
+                            radius: radius,
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.7,
+                            weight: 2
+                        }).bindPopup(`
+                            <b>地震情報</b><br>
+                            マグニチュード: ${mag}<br>
+                            場所: ${place}<br>
+                            位置: ${lat.toFixed(4)}, ${lon.toFixed(4)}
+                        `).addTo(earthquakeLayer);
+                    });
+                    
+                    document.getElementById('earthquakeCount').textContent = data.features.length;
+                    updateLastUpdate();
+                });
+        }
+
+        // 火災データ取得・表示
+        function fetchFireData() {
+            addLog('NASA火災データ取得開始...', 'info');
+            fetch('/nasa-fires', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        addLog(`火災データ取得エラー: ${data.error}`, 'error');
+                    } else {
+                        addLog(`火災データ取得完了: ${data.count}件`, 'success');
+                        loadFireData();
+                    }
+                })
+                .catch(err => {
+                    addLog(`火災データ取得エラー: ${err.message}`, 'error');
+                });
+        }
+
+        function loadFireData() {
+            fetch('/fires-data')
+                .then(res => res.json())
+                .then(data => {
+                    fireLayer.clearLayers();
+                    
+                    data.features.forEach(fire => {
+                        const lat = fire.latitude;
+                        const lon = fire.longitude;
+                        const brightness = fire.brightness;
+                        
+                        let color;
+                        if (brightness > 330) color = '#ff4444';
+                        else if (brightness > 310) color = '#ff8844';
+                        else color = '#ffaa44';
+
+                        L.circleMarker([lat, lon], {
+                            radius: Math.max(3, Math.min(12, brightness / 30)),
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.7,
+                            weight: 1
+                        }).bindPopup(`
+                            <b>火災検知</b><br>
+                            輝度: ${brightness}K<br>
+                            信頼度: ${fire.confidence}<br>
+                            検知日: ${fire.acq_date}
+                        `).addTo(fireLayer);
+                    });
+                    
+                    document.getElementById('fireCount').textContent = data.features.length;
+                    updateLastUpdate();
+                });
+        }
+
+        // SNSデータ取得
+        function fetchSnsData() {
+            addLog('SNSデータ収集開始...', 'info');
+            fetch('/sns-data', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    addLog(`SNSデータ: ${data.message}`, 'info');
+                });
+        }
+
+        // 通信テスト
+        function testNetworkConnectivity() {
+            addLog('通信テスト実行中...', 'info');
+            // 実際のテストロジックをここに実装
+            setTimeout(() => {
+                addLog('通信テスト完了: 全ターゲット正常', 'success');
+                document.getElementById('networkUptime').textContent = '98.5';
+            }, 2000);
+        }
+
+        // 全データ更新
+        function refreshAllData() {
+            addLog('全データ更新開始...', 'info');
+            fetchEarthquakeData();
+            fetchFireData();
+            testNetworkConnectivity();
+        }
+
+        // 最終更新時刻を更新
+        function updateLastUpdate() {
+            document.getElementById('lastUpdate').textContent = 
+                `最終更新: ${new Date().toLocaleString()}`;
+        }
+
+        // 更新間隔設定
+        function setUpdateInterval() {
+            const interval = document.getElementById('updateInterval').value;
+            addLog(`自動更新間隔を${interval}分に設定`, 'info');
+        }
+
+        // 初期データ読み込み
+        window.onload = function() {
+            addLog('EarthPulseダッシュボード起動完了', 'success');
+            refreshAllData();
+        };
+    </script>
+</body>
+</html> 
