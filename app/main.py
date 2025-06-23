@@ -131,16 +131,15 @@ async def store_nasa_fires():
                     float(row["bright_t31"]),
                     float(row["frp"]),
                     row["daynight"],
-                    datetime.utcnow()
+                    datetime.now(timezone.utc)
                     )
                     count += 1
                 except Exception as e:
                     print(f"Error inserting fire data row: {e}")
-                    continue
 
         return {"message": "NASA fire data stored successfully.", "count": count}
     except Exception as e:
-        return {"error": f"Failed to fetch NASA fire data: {str(e)}"}
+        return {"error": f"Failed to fetch NASA fire data: {str(e)}"}, 500
 
 # 火災データ取得API
 @app.get("/fires-data")
@@ -148,19 +147,20 @@ async def get_fires_data():
     """フロントエンド用の火災データ取得API"""
     async with app.state.pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT latitude, longitude, brightness, acq_date, acq_time, confidence
+            SELECT latitude, longitude, brightness, confidence, acq_date, acq_time, frp
             FROM fire_data
             ORDER BY timestamp DESC
-            LIMIT 100
+            LIMIT 500
         """)
         result = [
             {
                 "latitude": row["latitude"],
                 "longitude": row["longitude"],
                 "brightness": row["brightness"],
+                "confidence": row["confidence"],
                 "acq_date": row["acq_date"],
                 "acq_time": row["acq_time"],
-                "confidence": row["confidence"]
+                "frp": row["frp"]
             }
             for row in rows
         ]
@@ -169,6 +169,7 @@ async def get_fires_data():
 # Leaflet 地図用テンプレート呼び出し
 @app.get("/map-earthquakes", response_class=HTMLResponse)
 async def map_earthquakes(request: Request):
+<<<<<<< Updated upstream
     """地震データの地図表示ページ"""
     return templates.TemplateResponse("earthquake_map.html", {"request": request})
 
@@ -180,19 +181,24 @@ async def map_predict(request: Request):
 @app.get("/map-fires", response_class=HTMLResponse)
 async def map_fires(request: Request):
     """火災データの地図表示ページ"""
+=======
+    return templates.TemplateResponse("map-earthquakes.html", {"request": request})
+
+@app.get("/fire-map", response_class=HTMLResponse)
+async def fire_map(request: Request):
+>>>>>>> Stashed changes
     return templates.TemplateResponse("fire_map.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """統合監視ダッシュボードページ"""
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# 推論エンドポイント
+# 予測関連エンドポイント
 @app.post("/infer", response_model=InferResponse)
-def infer_endpoint(req: InferRequest):
-    """災害予測推論API"""
-    return infer(req)
+async def infer_endpoint(request: InferRequest):
+    return infer(request)
 
+<<<<<<< Updated upstream
 # Raspberry Pi用のPing結果受信エンドポイント
 class PingResult(BaseModel):
     target: str
@@ -221,3 +227,13 @@ async def store_sns_data():
     """SNS（Twitter/X）からの災害関連データ取得"""
     # TODO: Twitter API v2を使用した実装
     return {"message": "SNS data collection - not implemented yet", "status": "pending"}
+=======
+@app.get("/")
+async def root():
+    return {"message": "EarthPulse API is running"}
+
+# 健康チェックエンドポイント
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+>>>>>>> Stashed changes
